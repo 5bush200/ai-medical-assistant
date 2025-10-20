@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --cool-blue: #E0F7FA;
+  --mint-green: #E8F5E9;
+  --soft-white: #F5F5F5;
+  --neon-cyan: #00E5FF;
+  --dark-bg: #0d1a21;
+}
+
+.dark{ --cool-blue: #1A2E35; --mint-green: #1B2B29; --soft-white: #121212 }
+
+.glass-panel{ background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border:1px solid rgba(255,255,255,0.2) }
+
+.animate-pulse-glow{ animation: pulse 2.5s infinite ease-in-out }
+
+@keyframes pulse{ 0%,100%{ opacity:1; transform:scale(1); box-shadow:0 0 10px var(--neon-cyan) } 50%{ opacity:0.8; transform:scale(1.05); box-shadow:0 0 20px var(--neon-cyan) } }

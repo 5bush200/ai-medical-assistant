@@ -1,0 +1,14 @@
+import { Routes, Route } from 'react-router-dom'
+import ChatInterface from './components/ChatInterface'
+
+const App = () => {
+  return (
+    <div className="min-h-screen bg-background">
+      <Routes>
+        <Route path="/" element={<ChatInterface />} />
+      </Routes>
+    </div>
+  )
+}
+
+export default App
