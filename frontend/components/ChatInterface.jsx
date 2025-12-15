@@ -1,25 +1,23 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Menu, X, Stethoscope, Plus } from 'lucide-react'
-import Sidebar from './Sidebar'
+import { Send, Plus } from 'lucide-react'
 import MessageBubble from './MessageBubble'
-import TopicButton from './TopicButton'
-import { conversations, medicalTopics } from '../data/mockData'
-import { fadeIn, slideUp } from '../utils/motion'
+import { chatAPI } from '../utils/apiClient'
+import { v4 as uuidv4 } from 'uuid'
 
 const ChatInterface = () => {
   const [messages, setMessages] = useState([
     {
       id: 1,
-      text: 'Hello! I\'m your Medical Assistant AI. How can I help you today?',
+      text: 'Hello! How can I help you today?',
       sender: 'ai',
       timestamp: new Date().toISOString()
     }
   ])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [activeConversation, setActiveConversation] = useState(null)
+  const [userId, setUserId] = useState(() => localStorage.getItem('userId') || uuidv4())
+  const [currentConvId, setCurrentConvId] = useState(() => localStorage.getItem('currentConvId') || uuidv4())
   const messagesEndRef = useRef(null)
 
   const scrollToBottom = () => {
@@ -29,6 +27,12 @@ const ChatInterface = () => {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Initialize user
+  useEffect(() => {
+    localStorage.setItem('userId', userId)
+    localStorage.setItem('currentConvId', currentConvId)
+  }, [userId])
 
   const handleSend = async () => {
     if (!input.trim()) return
@@ -44,148 +48,106 @@ const ChatInterface = () => {
     setInput('')
     setIsTyping(true)
 
-    setTimeout(() => {
+    try {
+      const response = await chatAPI.sendMessage(input, currentConvId, userId)
+      setMessages(prev => [...prev, response.aiMessage])
+    } catch (err) {
+      console.error('Chat error:', err)
       const aiResponse = {
         id: Date.now() + 1,
-        text: 'Thank you for your question. As a medical assistant, I can provide general health information. However, for specific medical advice, please consult with a healthcare professional.',
+        text: 'Sorry, I encountered an error. Please try again.',
         sender: 'ai',
         timestamp: new Date().toISOString()
       }
       setMessages(prev => [...prev, aiResponse])
+    } finally {
       setIsTyping(false)
-    }, 1500)
-  }
-
-  const handleTopicClick = (topic) => {
-    setInput(topic.prompt)
+    }
   }
 
   const handleNewChat = () => {
+    const newConvId = uuidv4()
+    setCurrentConvId(newConvId)
+    localStorage.setItem('currentConvId', newConvId)
     setMessages([
       {
         id: 1,
-        text: 'Hello! I\'m your Medical Assistant AI. How can I help you today?',
+        text: 'Hello! How can I help you today?',
         sender: 'ai',
         timestamp: new Date().toISOString()
       }
     ])
-    setActiveConversation(null)
-  }
-
-  const handleConversationSelect = (conv) => {
-    setActiveConversation(conv)
-    setMessages(conv.messages)
-    setSidebarOpen(false)
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        conversations={conversations}
-        onSelectConversation={handleConversationSelect}
-        onNewChat={handleNewChat}
-      />
-
-      <div className="flex-1 flex flex-col">
-        <motion.header
-          {...fadeIn}
-          className="bg-surface border-b border-border px-4 py-4 flex items-center justify-between shadow-soft"
+    <div className="flex flex-col h-screen bg-white">
+      {/* Header */}
+      <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-gray-800">Medical AI Assistant</h1>
+        <button
+          onClick={handleNewChat}
+          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
         >
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
-            >
-              {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                <Stethoscope className="text-white" size={20} />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold text-text">Medical Assistant AI</h1>
-                <p className="text-xs text-textMuted">Always here to help</p>
-              </div>
+          <Plus size={18} />
+          <span>New chat</span>
+        </button>
+      </div>
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="max-w-2xl mx-auto space-y-4">
+          {messages.length === 1 && (
+            <div className="text-center py-12">
+              <h2 className="text-3xl font-semibold text-gray-800 mb-2">How can I help?</h2>
+              <p className="text-gray-500">Ask me anything. I'm here to assist you.</p>
             </div>
-          </div>
-          <button
-            onClick={handleNewChat}
-            className="hidden sm:flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            <Plus size={18} />
-            <span className="text-sm font-medium">New Chat</span>
-          </button>
-        </motion.header>
+          )}
 
-        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scrollbar-hide">
-          <motion.div {...slideUp} className="max-w-4xl mx-auto space-y-4">
-            {messages.length === 1 && (
-              <div className="mb-8">
-                <h2 className="text-2xl font-semibold text-text mb-4 text-center">How can I assist you today?</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {medicalTopics.map(topic => (
-                    <TopicButton
-                      key={topic.id}
-                      topic={topic}
-                      onClick={() => handleTopicClick(topic)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+          <AnimatePresence>
+            {messages.map((msg, index) => (
+              <MessageBubble key={msg.id} message={msg} index={index} />
+            ))}
+          </AnimatePresence>
 
-            <AnimatePresence>
-              {messages.map((msg, index) => (
-                <MessageBubble key={msg.id} message={msg} index={index} />
-              ))}
-            </AnimatePresence>
-
-            {isTyping && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-2 text-textMuted"
-              >
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                  <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                  <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                </div>
-                <span className="text-sm">AI is typing...</span>
-              </motion.div>
-            )}
-            <div ref={messagesEndRef} />
-          </motion.div>
-        </div>
-
-        <motion.div
-          {...fadeIn}
-          className="border-t border-border bg-surface px-4 py-4 shadow-medium"
-        >
-          <div className="max-w-4xl mx-auto flex gap-3">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Type your medical question here..."
-              className="flex-1 px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-            />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim()}
-              className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+          {isTyping && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex gap-3"
             >
-              <Send size={18} />
-              <span className="hidden sm:inline">Send</span>
-            </button>
-          </div>
-          <p className="text-xs text-textMuted text-center mt-3 max-w-4xl mx-auto">
-            This AI assistant provides general health information only. Always consult healthcare professionals for medical advice.
-          </p>
-        </motion.div>
+              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="text-sm">🤖</div>
+              </div>
+              <div className="flex gap-1 items-center">
+                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+              </div>
+            </motion.div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      {/* Input Area */}
+      <div className="border-t border-gray-200 px-4 py-4 bg-white">
+        <div className="max-w-2xl mx-auto flex gap-3">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && !isTyping && handleSend()}
+            placeholder="Message..."
+            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500"
+          />
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() || isTyping}
+            className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          >
+            <Send size={18} />
+          </button>
+        </div>
       </div>
     </div>
   )
